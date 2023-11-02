@@ -6,6 +6,77 @@ lapply(packages, library, character.only = T)
 #### Read in CSV and split into historic and future ####
 daily <- read_csv("Daily_streamflow.csv") %>% 
   select(c("date", "model", "daily_cfs", "rcp"))
+
+daily_rcp <- daily %>%
+  group_by(rcp, date) %>%
+  dplyr::summarize_at(vars(daily_cfs), 
+                      list(mean=mean, 
+                           Q05=~quantile(., probs = 0.05),
+                           Q25=~quantile(., probs = 0.25),
+                           median=median, 
+                           Q75=~quantile(., probs = 0.75),
+                           Q95=~quantile(., probs = 0.95)))
+daily_rcp_list <- split(daily_rcp, daily_rcp$rcp)
+monthly_rcp <- daily %>%
+  group_by(rcp, month(date), year(date)) %>%
+  dplyr::summarize_at(vars(daily_cfs), 
+                      list(mean=mean, 
+                           Q05=~quantile(., probs = 0.05),
+                           Q25=~quantile(., probs = 0.25),
+                           median=median, 
+                           Q75=~quantile(., probs = 0.75),
+                           Q95=~quantile(., probs = 0.95))) %>% 
+  mutate(date = make_date(`year(date)`, `month(date)`)) %>% 
+  select(!c(`year(date)`))
+monthly_rcp_list <- split(monthly_rcp, monthly_rcp$rcp)
+annual_rcp <- daily %>%
+  group_by(rcp, year(date)) %>%
+  dplyr::summarize_at(vars(daily_cfs), 
+                      list(mean=mean, 
+                           Q05=~quantile(., probs = 0.05),
+                           Q25=~quantile(., probs = 0.25),
+                           median=median, 
+                           Q75=~quantile(., probs = 0.75),
+                           Q95=~quantile(., probs = 0.95))) %>% 
+  rename(date = `year(date)`)
+annual_rcp_list <- split(annual_rcp, annual_rcp$rcp)
+
+
+# graph prototype
+annual_rcp_list$Hist %>% ggplot(aes(x=date, y = mean)) + 
+    geom_line(aes(y=Q05, color="5th Percentile", lty="5th Percentile"), lwd=1) +
+    geom_line(aes(y=Q95, color="95th Percentile", lty="95th Percentile"), lwd=1) +
+    geom_ribbon(aes(x=date, ymin = Q05, ymax = Q95), fill = "#E0EEEE", alpha = 0.5) +
+    geom_smooth(method = "loess", se=F, col="gray")+
+    geom_line(aes(color = "Annual Mean Historical", lty = "Annual Mean Historical"), lwd=1) + 
+    # RCP lines and ribbon
+    geom_ribbon(data = annual_rcp_list$`45`, aes(x=date, ymin = Q05, ymax = Q95), fill = "#E0EEEE", alpha = 0.5) +
+    geom_smooth(data = annual_rcp_list$`45`, aes(x=date, y = mean), method = "loess", se=F, col="gray") +
+    geom_line(data = annual_rcp_list$`45`, aes(x=date, y = mean, color = "Projected Ensemble Annual Mean", lty = "Projected Ensemble Annual Mean"), lwd = 1)+
+    geom_line(data = annual_rcp_list$`45`, aes(y=Q05, color="5th Percentile", lty="5th Percentile"), lwd=1) +
+    geom_line(data = annual_rcp_list$`45`, aes(y=Q95, color="95th Percentile", lty="95th Percentile"), lwd=1) +
+    theme_bw() +
+    scale_color_manual(name = "Legend", 
+                          values = c("5th Percentile" = "dodgerblue", 
+                                      "95th Percentile" = "dodgerblue4",
+                                      "Projected Ensemble Annual Mean" = "red",
+                                     "Annual Mean Historical" = "black")) +
+    scale_linetype_manual(name = "Legend",
+                              values = c("5th Percentile" = 3,
+                                        "95th Percentile" = 3,
+                                        "Projected Ensemble Annual Mean" = 1,
+                                        "Annual Mean Historical" = 1)) + 
+  labs(x="Year", y="Annual Flow (cfs)", title=paste0("Annual Historical and RCP4.5 Projected Streamflow for WBC")) +
+  theme(plot.title = element_text(hjust=0.5, face="bold"),
+        axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"),
+        legend.title = element_text(size=14),
+        legend.text = element_text(size=10),
+        legend.title.align=0.5)
+
+
+
+
 historic <- daily %>% filter(rcp == "Hist")
 projections <- daily %>% filter(rcp == "45" | rcp == "85")
 # read_csv reads in as a tibble; detects dates!
