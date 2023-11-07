@@ -3,9 +3,12 @@ packages <-  c("tidyverse", "tidyquant", "gridExtra")
 lapply(packages, library, character.only = T)
 
 
-#### Read in CSV and split into historic and future ####
+#### Read in CSV ####
 daily <- read_csv("Daily_streamflow.csv") %>% 
-  select(c("date", "model", "daily_cfs", "rcp"))
+  select(c("date", "yr", "model", "yr_mo", "daily_cfs", "rcp"))
+
+
+#### Testing wrangling options ####
 
 daily_rcp <- daily %>%
   group_by(rcp, date) %>%
@@ -41,8 +44,45 @@ annual_rcp <- daily %>%
   rename(date = `year(date)`)
 annual_rcp_list <- split(annual_rcp, annual_rcp$rcp)
 
+#### Function for Wrangling Daily, Monthly, and Annual ####
+# Tidy Evaluation: https://dcl-prog.stanford.edu/tidy-eval-detailed.html 
+#' Function for Wrangling Daily, Monthly, and Annual
+#' summarizes mean, median, Q05, Q25, Q75, and Q95
 
-# graph prototype
+wrangle_projections <- function(dataframe, summary_var, ...) {
+  #' dataframe = the input dataframe to wrangle. Should be dailys
+  #' summary_column = the column you are performing the summary on (tidy eval)
+  #' ... = the variables to group_by (tidy eval)
+  summary_var <- enquo(summary_var) # tidy eval  
+  
+  df <- dataframe %>%
+  group_by(...) %>%
+  dplyr::summarize_at(vars(!! summary_var),
+                    list(mean=mean,
+                         Q05=~quantile(., probs = 0.05),
+                         Q25=~quantile(., probs = 0.25),
+                         median=median,
+                         Q75=~quantile(., probs = 0.75),
+                         Q95=~quantile(., probs = 0.95)))
+  split(df, df$rcp)
+}
+
+Daily_test <- wrangle_projections(daily, daily_cfs, rcp, date)
+Monthly_test <- wrangle_projections(daily, daily_cfs, rcp, yr_mo)
+Annual_test <- wrangle_projections(daily, daily_cfs, rcp, yr)
+
+#### function to grab the `...` inputs
+test <- function(...){
+  output <- list(...)
+  if ("x" %in% output) {
+    print(output)
+  } 
+}
+
+test("y", "z")
+
+
+#### Graph Prototype ####
 annual_rcp_list$Hist %>% ggplot(aes(x=date, y = mean)) + 
     geom_line(aes(y=Q05, color="5th Percentile", lty="5th Percentile"), lwd=1) +
     geom_line(aes(y=Q95, color="95th Percentile", lty="95th Percentile"), lwd=1) +
@@ -57,8 +97,8 @@ annual_rcp_list$Hist %>% ggplot(aes(x=date, y = mean)) +
     geom_line(data = annual_rcp_list$`45`, aes(y=Q95, color="95th Percentile", lty="95th Percentile"), lwd=1) +
     theme_bw() +
     scale_color_manual(name = "Legend", 
-                          values = c("5th Percentile" = "dodgerblue", 
-                                      "95th Percentile" = "dodgerblue4",
+                          values = c("5th Percentile" = "dodgerblue4", 
+                                      "95th Percentile" = "aquamarine",
                                       "Projected Ensemble Annual Mean" = "red",
                                      "Annual Mean Historical" = "black")) +
     scale_linetype_manual(name = "Legend",
