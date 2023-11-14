@@ -8,6 +8,38 @@ daily <- read_csv("Daily_streamflow.csv") %>%
   select(c("date", "yr", "model", "yr_mo", "daily_cfs", "rcp"))
 
 
+
+#### Function for Wrangling Daily, Monthly, and Annual ####
+# Tidy Evaluation: https://dcl-prog.stanford.edu/tidy-eval-detailed.html 
+#' Function for Wrangling Daily, Monthly, and Annual
+#' summarizes mean, median, Q05, Q25, Q75, and Q95
+
+wrangle_projections <- function(dataframe, summary_var, ...) {
+  #' dataframe = the input dataframe to wrangle. Should be dailys
+  #' summary_column = the column you are performing the summary on (tidy eval)
+  #' ... = the variables to group_by (tidy eval)
+  summary_var <- enquo(summary_var) # tidy eval  
+  
+  df <- dataframe %>%
+  group_by(...) %>%
+  dplyr::summarize_at(vars(!! summary_var),
+                    list(mean=mean,
+                         Q01=~quantile(., probs = 0.01),
+                         Q05=~quantile(., probs = 0.05),
+                         Q25=~quantile(., probs = 0.25),
+                         median=median,
+                         Q75=~quantile(., probs = 0.75),
+                         Q95=~quantile(., probs = 0.95),
+                         Q99=~quantile(., probs = 0.99)))
+  split(df, df$rcp)
+}
+
+# test of function below
+Daily_test <- wrangle_projections(daily, daily_cfs, rcp, date)
+Monthly_test <- wrangle_projections(daily, daily_cfs, rcp, yr_mo)
+Annual_test <- wrangle_projections(daily, daily_cfs, rcp, yr)
+
+
 #### Testing wrangling options ####
 
 daily_rcp <- daily %>%
@@ -44,33 +76,6 @@ annual_rcp <- daily %>%
   rename(date = `year(date)`)
 annual_rcp_list <- split(annual_rcp, annual_rcp$rcp)
 
-#### Function for Wrangling Daily, Monthly, and Annual ####
-# Tidy Evaluation: https://dcl-prog.stanford.edu/tidy-eval-detailed.html 
-#' Function for Wrangling Daily, Monthly, and Annual
-#' summarizes mean, median, Q05, Q25, Q75, and Q95
-
-wrangle_projections <- function(dataframe, summary_var, ...) {
-  #' dataframe = the input dataframe to wrangle. Should be dailys
-  #' summary_column = the column you are performing the summary on (tidy eval)
-  #' ... = the variables to group_by (tidy eval)
-  summary_var <- enquo(summary_var) # tidy eval  
-  
-  df <- dataframe %>%
-  group_by(...) %>%
-  dplyr::summarize_at(vars(!! summary_var),
-                    list(mean=mean,
-                         Q05=~quantile(., probs = 0.05),
-                         Q25=~quantile(., probs = 0.25),
-                         median=median,
-                         Q75=~quantile(., probs = 0.75),
-                         Q95=~quantile(., probs = 0.95)))
-  split(df, df$rcp)
-}
-
-Daily_test <- wrangle_projections(daily, daily_cfs, rcp, date)
-Monthly_test <- wrangle_projections(daily, daily_cfs, rcp, yr_mo)
-Annual_test <- wrangle_projections(daily, daily_cfs, rcp, yr)
-
 #### function to grab the `...` inputs
 test <- function(...){
   output <- list(...)
@@ -78,8 +83,20 @@ test <- function(...){
     print(output)
   } 
 }
-
 test("y", "z")
+test("x", "z")
+
+
+#### Lookup table function ####
+
+get_value <- function(mykey, mylookupvector){
+  myvalue <- mylookupvector[mykey]
+  unname(myvalue)
+}
+
+test_df <- c("Q05" = "5th Percentile", "Q95" = "95th Percentile")
+
+
 
 
 #### Graph Prototype ####
@@ -113,6 +130,94 @@ annual_rcp_list$Hist %>% ggplot(aes(x=date, y = mean)) +
         legend.title = element_text(size=14),
         legend.text = element_text(size=10),
         legend.title.align=0.5)
+
+graph_timeseries_quantile <- function(ts_list,
+                                      rcp,
+                                      ylow = Q05,
+                                      yhigh = Q95,
+                                      ylow_char = "5th Percentile",
+                                      yhigh_char = "95th Percentile",
+                                      hist_name = "Annual Mean Historical",
+                                      proj_name = "Projected Ensemble Annual Mean",
+                                      hist_rcp_name = "Hist",
+                                      xaxis = date, 
+                                      ysmooth = mean) {
+  df_hist <- ts_list[[hist_rcp_name]]
+  df_rcp <- ts_list[[rcp]]
+  df_hist %>% ggplot(aes(x={{xaxis}}, y = {{ysmooth}})) +
+    geom_line(aes(y={{ylow}}, color=ylow_char, lty=ylow_char), lwd=1) +
+    geom_line(aes(y={{yhigh}}, color=yhigh_char, lty=yhigh_char), lwd=1) +
+    geom_ribbon(aes(x={{xaxis}}, ymin = {{ylow}}, ymax = {{yhigh}}), fill = "#E0EEEE", alpha = 0.5) +
+    geom_smooth(method = "loess", se=F, col="gray")+
+    geom_line(aes(color = hist_name, lty = hist_name), lwd=1) +
+    # RCP lines and ribbon
+    geom_ribbon(data = df_rcp, aes(x={{xaxis}}, ymin = {{ylow}}, ymax = {{yhigh}}), fill = "#E0EEEE", alpha = 0.5) +
+    geom_smooth(data = df_rcp, aes(x={{xaxis}}, y = {{ysmooth}}), method = "loess", se=F, col="gray") +
+    geom_line(data = df_rcp, aes(x={{xaxis}}, y = mean, color = proj_name, lty = proj_name), lwd = 1)+
+    geom_line(data = df_rcp, aes(y={{ylow}}, color=ylow_char, lty=ylow_char), lwd=1) +
+    geom_line(data = df_rcp, aes(y={{yhigh}}, color=yhigh_char, lty=yhigh_char), lwd=1) +
+    theme_bw() +
+    scale_color_manual(name = "Legend", 
+                       values = c(ylow_char = "dodgerblue4", 
+                                  yhigh_char = "aquamarine",
+                                  proj_name = "red",
+                                  hist_name = "black")) +
+    scale_linetype_manual(name = "Legend",
+                          values = c(ylow_char = 3,
+                                     yhigh_char = 3,
+                                     proj_name = 1,
+                                     hist_name = 1)) + 
+    labs(x="Year", y="Annual Flow (cfs)", title=paste0("Annual Historical and RCP4.5 Projected Streamflow for WBC")) +
+    theme(plot.title = element_text(hjust=0.5, face="bold"),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=14,face="bold"),
+          legend.title = element_text(size=14),
+          legend.text = element_text(size=10),
+          legend.title.align=0.5)
+}
+graph_timeseries_quantile(annual_rcp_list, rcp = "45")
+
+graph_timeseries_quantile <- function(ts_list,
+                                      rcp,
+                                      ylow = Q05,
+                                      yhigh = Q95,
+                                      hist_rcp_name = "Hist",
+                                      xaxis = date, 
+                                      ysmooth = mean) {
+  df_hist <- ts_list[[hist_rcp_name]]
+  df_rcp <- ts_list[[rcp]]
+  df_hist %>% ggplot(aes(x={{xaxis}}, y = {{ysmooth}})) +
+    geom_line(aes(y={{ylow}}, color="5th Percentile", lty="5th Percentile"), lwd=1) +
+    geom_line(aes(y={{yhigh}}, color="95th Percentile", lty="95th Percentile"), lwd=1) +
+    geom_ribbon(aes(x={{xaxis}}, ymin = {{ylow}}, ymax = {{yhigh}}), fill = "#E0EEEE", alpha = 0.5) +
+    geom_smooth(method = "loess", se=F, col="gray")+
+    geom_line(aes(color = "Annual Mean Historical", lty = "Annual Mean Historical"), lwd=1) +
+    # RCP lines and ribbon
+    geom_ribbon(data = df_rcp, aes(x={{xaxis}}, ymin = {{ylow}}, ymax = {{yhigh}}), fill = "#E0EEEE", alpha = 0.5) +
+    geom_smooth(data = df_rcp, aes(x={{xaxis}}, y = {{ysmooth}}), method = "loess", se=F, col="gray") +
+    geom_line(data = df_rcp, aes(x={{xaxis}}, y = mean, color = "Projected Ensemble Annual Mean", lty = "Projected Ensemble Annual Mean"), lwd = 1)+
+    geom_line(data = df_rcp, aes(y={{ylow}}, color="5th Percentile", lty="5th Percentile"), lwd=1) +
+    geom_line(data = df_rcp, aes(y={{yhigh}}, color="95th Percentile", lty="95th Percentile"), lwd=1) +
+    theme_bw() +
+    scale_color_manual(name = "Legend", 
+                       values = c("5th Percentile" = "dodgerblue4", 
+                                  "95th Percentile" = "aquamarine",
+                                  "Projected Ensemble Annual Mean" = "red",
+                                  "Annual Mean Historical" = "black")) +
+    scale_linetype_manual(name = "Legend",
+                          values = c("5th Percentile" = 3,
+                                     "95th Percentile" = 3,
+                                     "Projected Ensemble Annual Mean" = 1,
+                                     "Annual Mean Historical" = 1)) + 
+    labs(x="Year", y="Annual Flow (cfs)", title=paste0("Annual Historical and RCP4.5 Projected Streamflow for WBC")) +
+    theme(plot.title = element_text(hjust=0.5, face="bold"),
+          axis.text=element_text(size=12),
+          axis.title=element_text(size=14,face="bold"),
+          legend.title = element_text(size=14),
+          legend.text = element_text(size=10),
+          legend.title.align=0.5)
+}
+graph_timeseries_quantile(annual_rcp_list, rcp = "45")
 
 
 
