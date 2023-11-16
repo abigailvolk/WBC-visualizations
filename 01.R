@@ -105,22 +105,22 @@ graph_timeseries_quantile <- function(ts_list,
   get_label <- function(x) {
     x <- rlang::as_label(x)
     switch(x,
-           "Q01" = "1st Percentile",
-           "Q05" = "5th Percentile",
-           "Q25" = "25th Percentile",
+           "Q01" = "1st percentile",
+           "Q05" = "5th percentile",
+           "Q25" = "25th percentile",
            "median" = "median",
            "mean" = "mean",
-           "Q75" = "75th Percentile",
-           "Q95" = "95th Percentile",
-           "Q99" = "99th Percentile",
-           "unknown Percentile"
+           "Q75" = "75th percentile",
+           "Q95" = "95th percentile",
+           "Q99" = "99th percentile",
+           "unknown percentile"
     )
   }
   
   labels <- c(
     ylow = get_label(enquo(ylow)),
     yhigh = get_label(enquo(yhigh)),
-    ysmooth_fut = paste("Projected Ensemble", get_label(enquo(ysmooth))),
+    ysmooth_fut = paste("projected ensemble", get_label(enquo(ysmooth))),
     ysmooth = get_label(enquo(ysmooth))
   )
   
@@ -132,7 +132,7 @@ graph_timeseries_quantile <- function(ts_list,
   )
   
   pal_lty <- c(
-    ylow = 3,
+    ylow = 2,
     yhigh = 3,
     ysmooth = 1,
     ysmooth_fut = 1
@@ -182,7 +182,35 @@ graph_timeseries_quantile <- function(ts_list,
 }
 
 graph_timeseries_quantile(Annual_test, time_step = "Annual", xaxis = yr)
+graph_timeseries_quantile(Annual_test, time_step = "Annual", rcp = "85", xaxis = yr)
 
+
+timeseries_quantile_rcp_grid <- function(ts_list,
+                                time_step,
+                                hist_rcp_name = "Hist",
+                                ylow = Q05,
+                                yhigh = Q95,
+                                xaxis = date,
+                                ysmooth = mean) {
+  plot_1 <- graph_timeseries_quantile(ts_list,
+                                      time_step,
+                                      rcp = "45",
+                                      hist_rcp_name,
+                                      {{ylow}},
+                                      {{yhigh}},
+                                      {{xaxis}},
+                                      {{ysmooth}})
+  plot_2 <- graph_timeseries_quantile(ts_list,
+                                      time_step,
+                                      rcp = "85",
+                                      hist_rcp_name,
+                                      {{ylow}},
+                                      {{yhigh}},
+                                      {{xaxis}},
+                                      {{ysmooth}})
+  gridExtra::grid.arrange(plot_1, plot_2, ncol=2)
+}
+timeseries_quantile_rcp_grid(Annual_test, "Annual", xaxis = yr)
 
 
 #### Graph Prototype ####
