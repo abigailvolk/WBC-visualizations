@@ -87,39 +87,172 @@ test("y", "z")
 test("x", "z")
 
 
-#### Graph Prototype ####
-annual_rcp_list$Hist %>% ggplot(aes(x=date, y = mean)) + 
-    geom_line(aes(y=Q05, color="5th Percentile", lty="5th Percentile"), lwd=1) +
-    geom_line(aes(y=Q95, color="95th Percentile", lty="95th Percentile"), lwd=1) +
-    geom_ribbon(aes(x=date, ymin = Q05, ymax = Q95), fill = "#E0EEEE", alpha = 0.5) +
-    geom_smooth(method = "loess", se=F, col="gray")+
-    geom_line(aes(color = "Annual Mean Historical", lty = "Annual Mean Historical"), lwd=1) + 
-    # RCP lines and ribbon
-    geom_ribbon(data = annual_rcp_list$`45`, aes(x=date, ymin = Q05, ymax = Q95), fill = "#E0EEEE", alpha = 0.5) +
-    geom_smooth(data = annual_rcp_list$`45`, aes(x=date, y = mean), method = "loess", se=F, col="gray") +
-    geom_line(data = annual_rcp_list$`45`, aes(x=date, y = mean, color = "Projected Ensemble Annual Mean", lty = "Projected Ensemble Annual Mean"), lwd = 1)+
-    geom_line(data = annual_rcp_list$`45`, aes(y=Q05, color="5th Percentile", lty="5th Percentile"), lwd=1) +
-    geom_line(data = annual_rcp_list$`45`, aes(y=Q95, color="95th Percentile", lty="95th Percentile"), lwd=1) +
+
+#### New function customizable ####
+
+graph_timeseries_quantile <- function(ts_list,
+                                      hist_rcp_name = "Hist",
+                                      rcp = "45",
+                                      ylow = Q05,
+                                      yhigh = Q95,
+                                      xaxis = date,
+                                      ysmooth = mean
+                                      ) {
+  
+  df_hist <- ts_list[[hist_rcp_name]]
+  df_rcp <- ts_list[[rcp]]
+  get_label <- function(x) {
+    x <- rlang::as_label(x)
+    switch(x,
+           "Q01" = "1st Percentile",
+           "Q05" = "5th Percentile",
+           "Q25" = "25th Percentile",
+           "median" = "median",
+           "mean" = "mean",
+           "Q75" = "75th Percentile",
+           "Q95" = "95th Percentile",
+           "Q99" = "99th Percentile",
+           "unknown Percentile"
+    )
+  }
+  
+  labels <- c(
+    ylow = get_label(enquo(ylow)),
+    yhigh = get_label(enquo(yhigh)),
+    ysmooth_fut = paste("Projected Ensemble", get_label(enquo(ysmooth))),
+    ysmooth = get_label(enquo(ysmooth))
+  )
+  
+  pal_color <- c(
+    ylow = "dodgerblue4",
+    yhigh = "aquamarine",
+    ysmooth = "black",
+    ysmooth_fut = "red"
+  )
+  
+  pal_lty <- c(
+    ylow = 3,
+    yhigh = 3,
+    ysmooth = 1,
+    ysmooth_fut = 1
+  )
+  
+  df_hist %>% 
+    ggplot(aes(x = {{ xaxis }}, y = {{ ysmooth }})) +
+    geom_line(aes(y = {{ ylow }}, color = "ylow", lty = "ylow"), lwd = 1) +
+    geom_line(aes(y = {{ yhigh }}, color = "yhigh", lty = "yhigh"), lwd = 1) +
+    geom_ribbon(aes(x = {{ xaxis }}, ymin = {{ ylow }}, ymax = {{ yhigh }}),
+                fill = "#E0EEEE", alpha = 0.5
+    ) +
+    geom_smooth(method = "loess", se = F, col = "gray") +
+    geom_line(aes(color = "ysmooth", lty = "ysmooth"), lwd = 1) +
+    
+    
+    geom_ribbon(data = df_rcp, 
+                aes(x={{xaxis}}, ymin = {{ylow}}, ymax = {{yhigh}}), 
+                fill = "#E0EEEE", alpha = 0.5) +
+    geom_smooth(data = df_rcp, 
+                aes(x={{xaxis}}, y = {{ysmooth}}), 
+                method = "loess", se=F, col="gray") +
+    geom_line(data = df_rcp, aes(x={{xaxis}}, y =  {{ysmooth}}, 
+                                 color = "ysmooth_fut", 
+                                 lty = "ysmooth_fut"), lwd = 1)+
+    geom_line(data = df_rcp, 
+              aes(y={{ylow}}, color="ylow", lty="ylow"), lwd=1) +
+    geom_line(data = df_rcp, 
+              aes(y={{yhigh}}, color="yhigh", lty="yhigh"), lwd=1) +
     theme_bw() +
-    scale_color_manual(name = "Legend", 
-                          values = c("5th Percentile" = "dodgerblue4", 
-                                      "95th Percentile" = "aquamarine",
-                                      "Projected Ensemble Annual Mean" = "red",
-                                     "Annual Mean Historical" = "black")) +
-    scale_linetype_manual(name = "Legend",
-                              values = c("5th Percentile" = 3,
-                                        "95th Percentile" = 3,
-                                        "Projected Ensemble Annual Mean" = 1,
-                                        "Annual Mean Historical" = 1)) + 
-  labs(x="Year", y="Annual Flow (cfs)", title=paste0("Annual Historical and RCP4.5 Projected Streamflow for WBC")) +
-  theme(plot.title = element_text(hjust=0.5, face="bold"),
-        axis.text=element_text(size=12),
-        axis.title=element_text(size=14,face="bold"),
-        legend.title = element_text(size=14),
-        legend.text = element_text(size=10),
-        legend.title.align=0.5)
+    scale_color_manual(
+      name = "Legend",
+      limits = rev,
+      labels = labels,
+      values = pal_color
+    ) +
+    scale_linetype_manual(
+      name = "Legend",
+      limits = rev,
+      labels = labels,
+      values = pal_lty
+    ) +
+    labs(
+      x = "Year", y = "Annual Flow (cfs)",
+      title = paste0("Annual Historical Streamflow")
+    )
+}
+
+graph_timeseries_quantile(Annual_test, xaxis = yr)
 
 
+
+
+graph_timeseries_quantile <- function(ts_list,
+                                      hist_rcp_name = "Hist",
+                                      rcp = "45",
+                                      ylow = Q05,
+                                      yhigh = Q95,
+                                      xaxis = date,
+                                      ysmooth = mean) {
+  
+  df_hist <- ts_list[[hist_rcp_name]]
+  df_rcp <- ts_list[[rcp]]
+  get_label <- function(x) {
+    x <- rlang::as_label(x)
+    switch(x,
+           "Q05" = "5th Percentile",
+           "Q25" = "25th Percentile",
+           "Q75" = "75th Percentile",
+           "Q95" = "95th Percentile",
+           "unknown Percentile"
+    )
+  }
+  
+  labels <- c(
+    ylow = get_label(enquo(ylow)),
+    yhigh = get_label(enquo(yhigh)),
+    mean = "Annual Mean Historical"
+  )
+  
+  pal_color <- c(
+    ylow = "dodgerblue4",
+    yhigh = "aquamarine",
+    mean = "black"
+  )
+  
+  pal_lty <- c(
+    ylow = 3,
+    yhigh = 3,
+    mean = 1
+  )
+  
+  df_hist |>
+    ggplot(aes(x = {{ xaxis }}, y = {{ ysmooth }})) +
+    geom_line(aes(y = {{ ylow }}, color = "ylow", lty = "ylow"), lwd = 1) +
+    geom_line(aes(y = {{ yhigh }}, color = "yhigh", lty = "yhigh"), lwd = 1) +
+    geom_ribbon(aes(x = {{ xaxis }}, ymin = {{ ylow }}, ymax = {{ yhigh }}),
+                fill = "#E0EEEE", alpha = 0.5) +
+    geom_smooth(method = "loess", se = F, col = "gray") +
+    geom_line(aes(color = "mean", lty = "mean"), lwd = 1) +
+    # RCP lines and ribbon
+    theme_bw() +
+    scale_color_manual(
+      name = "Legend",
+      limits = rev,
+      labels = labels,
+      values = pal_color
+    ) +
+    scale_linetype_manual(
+      name = "Legend",
+      limits = rev,
+      labels = labels,
+      values = pal_lty
+    ) +
+    labs(
+      x = "Year", y = "Annual Flow (cfs)",
+      title = paste0("Annual Historical Streamflow")
+    )
+}
+
+graph_timeseries_quantile(df_hist)
 
 
 
@@ -169,6 +302,37 @@ graph_timeseries_quantile <- function(ts_list,
 graph_timeseries_quantile(annual_rcp_list, rcp = "45")
 graph_timeseries_quantile(Annual_test, rcp = "45", xaxis = yr)
 
+#### Graph Prototype ####
+annual_rcp_list$Hist %>% ggplot(aes(x=date, y = mean)) + 
+  geom_line(aes(y=Q05, color="5th Percentile", lty="5th Percentile"), lwd=1) +
+  geom_line(aes(y=Q95, color="95th Percentile", lty="95th Percentile"), lwd=1) +
+  geom_ribbon(aes(x=date, ymin = Q05, ymax = Q95), fill = "#E0EEEE", alpha = 0.5) +
+  geom_smooth(method = "loess", se=F, col="gray")+
+  geom_line(aes(color = "Annual Mean Historical", lty = "Annual Mean Historical"), lwd=1) + 
+  # RCP lines and ribbon
+  geom_ribbon(data = annual_rcp_list$`45`, aes(x=date, ymin = Q05, ymax = Q95), fill = "#E0EEEE", alpha = 0.5) +
+  geom_smooth(data = annual_rcp_list$`45`, aes(x=date, y = mean), method = "loess", se=F, col="gray") +
+  geom_line(data = annual_rcp_list$`45`, aes(x=date, y = mean, color = "Projected Ensemble Annual Mean", lty = "Projected Ensemble Annual Mean"), lwd = 1)+
+  geom_line(data = annual_rcp_list$`45`, aes(y=Q05, color="5th Percentile", lty="5th Percentile"), lwd=1) +
+  geom_line(data = annual_rcp_list$`45`, aes(y=Q95, color="95th Percentile", lty="95th Percentile"), lwd=1) +
+  theme_bw() +
+  scale_color_manual(name = "Legend", 
+                     values = c("5th Percentile" = "dodgerblue4", 
+                                "95th Percentile" = "aquamarine",
+                                "Projected Ensemble Annual Mean" = "red",
+                                "Annual Mean Historical" = "black")) +
+  scale_linetype_manual(name = "Legend",
+                        values = c("5th Percentile" = 3,
+                                   "95th Percentile" = 3,
+                                   "Projected Ensemble Annual Mean" = 1,
+                                   "Annual Mean Historical" = 1)) + 
+  labs(x="Year", y="Annual Flow (cfs)", title=paste0("Annual Historical and RCP4.5 Projected Streamflow for WBC")) +
+  theme(plot.title = element_text(hjust=0.5, face="bold"),
+        axis.text=element_text(size=12),
+        axis.title=element_text(size=14,face="bold"),
+        legend.title = element_text(size=14),
+        legend.text = element_text(size=10),
+        legend.title.align=0.5)
 
 
 
