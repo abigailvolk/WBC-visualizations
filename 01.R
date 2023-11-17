@@ -109,7 +109,8 @@ graph_timeseries_quantile <- function(ts_list,
                                       xaxis = date,
                                       ysmooth = mean,
                                       titles = F,
-                                      nps = F
+                                      nps = F,
+                                      proj_col = "red"
                                       ) {
   
   df_hist <- ts_list[[hist_rcp_name]]
@@ -140,7 +141,7 @@ graph_timeseries_quantile <- function(ts_list,
     ylow = "dodgerblue4",
     yhigh = "aquamarine",
     ysmooth = "black",
-    ysmooth_fut = "red"
+    ysmooth_fut = proj_col
   )
   
   pal_lty <- c(
@@ -206,7 +207,7 @@ graph_timeseries_quantile <- function(ts_list,
   return(p)
 }
 
-graph_timeseries_quantile(Annual_test, time_step = "Annual", xaxis = yr, nps = F)
+graph_timeseries_quantile(Annual_test, time_step = "Annual", xaxis = yr, nps = F, proj_col = "pink")
 graph_timeseries_quantile(Annual_test, time_step = "Annual", rcp = "85", xaxis = yr)
 
 
@@ -216,7 +217,11 @@ timeseries_quantile_rcp_grid <- function(ts_list,
                                 ylow = Q05,
                                 yhigh = Q95,
                                 xaxis = date,
-                                ysmooth = mean) {
+                                ysmooth = mean,
+                                titles = F,
+                                nps = F,
+                                rcp_45_col = "orange",
+                                rcp_85_col = "red") {
   plot_1 <- graph_timeseries_quantile(ts_list,
                                       time_step,
                                       rcp = "45",
@@ -224,7 +229,10 @@ timeseries_quantile_rcp_grid <- function(ts_list,
                                       {{ylow}},
                                       {{yhigh}},
                                       {{xaxis}},
-                                      {{ysmooth}})
+                                      {{ysmooth}},
+                                      titles = titles,
+                                      nps = nps,
+                                      proj_col = rcp_45_col)
   plot_2 <- graph_timeseries_quantile(ts_list,
                                       time_step,
                                       rcp = "85",
@@ -232,10 +240,13 @@ timeseries_quantile_rcp_grid <- function(ts_list,
                                       {{ylow}},
                                       {{yhigh}},
                                       {{xaxis}},
-                                      {{ysmooth}})
+                                      {{ysmooth}},
+                                      titles = titles,
+                                      nps = nps,
+                                      proj_col = rcp_85_col)
   gridExtra::grid.arrange(plot_1, plot_2, ncol=2)
 }
-timeseries_quantile_rcp_grid(Annual_test, "Annual", xaxis = yr)
+timeseries_quantile_rcp_grid(Annual_test, "Annual", xaxis = yr, nps = T)
 
 
 #### Graph Prototype ####
