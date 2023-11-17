@@ -3,6 +3,16 @@ packages <-  c("tidyverse", "tidyquant", "gridExtra")
 lapply(packages, library, character.only = T)
 
 
+windowsFonts("Frutiger LT Std 55 Roman" = windowsFont("Frutiger LT Std 55 Roman"))
+fontsize=20
+nps_font <- "Frutiger LT Std 55 Roman" ###NPS fonts
+nps_theme2 <- function(base_size = fontsize, base_family=nps_font) {
+  theme_bw(base_size = base_size, base_family = nps_font) %+replace%
+    theme(axis.text.x = element_text(family=nps_font, size = base_size * 0.8),
+          complete = TRUE
+    )}
+
+
 #### Read in CSV ####
 daily <- read_csv("Daily_streamflow.csv") %>% 
   select(c("date", "yr", "model", "yr_mo", "daily_cfs", "rcp"))
@@ -97,7 +107,9 @@ graph_timeseries_quantile <- function(ts_list,
                                       ylow = Q05,
                                       yhigh = Q95,
                                       xaxis = date,
-                                      ysmooth = mean
+                                      ysmooth = mean,
+                                      titles = F,
+                                      nps = F
                                       ) {
   
   df_hist <- ts_list[[hist_rcp_name]]
@@ -138,7 +150,7 @@ graph_timeseries_quantile <- function(ts_list,
     ysmooth_fut = 1
   )
   
-  df_hist %>% 
+  p <- df_hist %>% 
     ggplot(aes(x = {{ xaxis }}, y = {{ ysmooth }})) +
     geom_line(aes(y = {{ ylow }}, color = "ylow", lty = "ylow"), lwd = 1) +
     geom_line(aes(y = {{ yhigh }}, color = "yhigh", lty = "yhigh"), lwd = 1) +
@@ -167,21 +179,34 @@ graph_timeseries_quantile <- function(ts_list,
       name = "Legend",
       limits = rev,
       labels = labels,
-      values = pal_color
-    ) +
+      values = pal_color) +
     scale_linetype_manual(
       name = "Legend",
       limits = rev,
       labels = labels,
-      values = pal_lty
-    ) +
+      values = pal_lty) +
     labs(
       x = "Year", y = "Flow (cfs)",
-      title = paste("Historical and Projected RCP", rcp, time_step, "Streamflow")
-    )
+    ) 
+  if(nps == T & titles == T) {
+      p <- p + 
+        nps_theme2() + labs(
+          title = paste("Historical and Projected RCP", rcp, time_step, "Streamflow") 
+        )
+  } else if(nps == T & titles == F) {
+      p <- p + nps_theme2()
+  } else if(nps == F & titles == T) {
+      p <- p + 
+        labs(
+          title = paste("Historical and Projected RCP", rcp, time_step, "Streamflow") 
+        )
+  } else{
+    p
+  }
+  return(p)
 }
 
-graph_timeseries_quantile(Annual_test, time_step = "Annual", xaxis = yr)
+graph_timeseries_quantile(Annual_test, time_step = "Annual", xaxis = yr, nps = F)
 graph_timeseries_quantile(Annual_test, time_step = "Annual", rcp = "85", xaxis = yr)
 
 
