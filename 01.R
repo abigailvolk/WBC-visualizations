@@ -17,6 +17,7 @@ nps_theme2 <- function(base_size = fontsize, base_family=nps_font) {
 daily <- read_csv("Daily_streamflow.csv") %>% 
   select(c("date", "yr", "model", "yr_mo", "daily_cfs", "rcp"))
 
+# Note: input being a tibble is important.
 
 
 #### Function for Wrangling Daily, Monthly, and Annual ####
@@ -111,7 +112,7 @@ graph_timeseries_quantile <- function(ts_list,
                                       titles = F,
                                       nps = F,
                                       proj_col = "red"
-                                      ) {
+) {
   
   df_hist <- ts_list[[hist_rcp_name]]
   df_rcp <- ts_list[[rcp]]
@@ -133,7 +134,7 @@ graph_timeseries_quantile <- function(ts_list,
   labels <- c(
     ylow = get_label(enquo(ylow)),
     yhigh = get_label(enquo(yhigh)),
-    ysmooth_fut = paste("projected ensemble", get_label(enquo(ysmooth))),
+    ysmooth_fut = paste("ensemble", get_label(enquo(ysmooth))),
     ysmooth = get_label(enquo(ysmooth))
   )
   
@@ -153,11 +154,11 @@ graph_timeseries_quantile <- function(ts_list,
   
   p <- df_hist %>% 
     ggplot(aes(x = {{ xaxis }}, y = {{ ysmooth }})) +
-    geom_line(aes(y = {{ ylow }}, color = "ylow", lty = "ylow"), lwd = 1) +
-    geom_line(aes(y = {{ yhigh }}, color = "yhigh", lty = "yhigh"), lwd = 1) +
-    geom_ribbon(aes(x = {{ xaxis }}, ymin = {{ ylow }}, ymax = {{ yhigh }}),
-                fill = "#E0EEEE", alpha = 0.5
-    ) +
+    # geom_line(aes(y = {{ ylow }}, color = "ylow", lty = "ylow"), lwd = 1) +
+    # geom_line(aes(y = {{ yhigh }}, color = "yhigh", lty = "yhigh"), lwd = 1) +
+    # geom_ribbon(aes(x = {{ xaxis }}, ymin = {{ ylow }}, ymax = {{ yhigh }}),
+    #             fill = "#E0EEEE", alpha = 0.5
+    # ) +
     geom_smooth(method = "loess", se = F, col = "gray") +
     geom_line(aes(color = "ysmooth", lty = "ysmooth"), lwd = 1) +
     
@@ -177,12 +178,12 @@ graph_timeseries_quantile <- function(ts_list,
               aes(y={{yhigh}}, color="yhigh", lty="yhigh"), lwd=1) +
     theme_bw() +
     scale_color_manual(
-      name = "Legend",
+      name = " ",
       limits = rev,
       labels = labels,
       values = pal_color) +
     scale_linetype_manual(
-      name = "Legend",
+      name = " ",
       limits = rev,
       labels = labels,
       values = pal_lty) +
@@ -190,17 +191,17 @@ graph_timeseries_quantile <- function(ts_list,
       x = "Year", y = "Flow (cfs)",
     ) 
   if(nps == T & titles == T) {
-      p <- p + 
-        nps_theme2() + labs(
-          title = paste("Historical and Projected RCP", rcp, time_step, "Streamflow") 
-        )
+    p <- p + 
+      nps_theme2() + labs(
+        title = paste("Historical and Projected RCP", rcp, time_step, "Streamflow") 
+      )
   } else if(nps == T & titles == F) {
-      p <- p + nps_theme2()
+    p <- p + nps_theme2()
   } else if(nps == F & titles == T) {
-      p <- p + 
-        labs(
-          title = paste("Historical and Projected RCP", rcp, time_step, "Streamflow") 
-        )
+    p <- p + 
+      labs(
+        title = paste("Historical and Projected RCP", rcp, time_step, "Streamflow") 
+      )
   } else{
     p
   }
